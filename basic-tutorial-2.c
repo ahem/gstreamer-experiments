@@ -25,7 +25,7 @@ static gboolean handle_message (GstBus *bus, GstMessage *msg, void *user_data) {
 }
 
 int main(int argc, char *argv[]) {
-  GstElement *pipeline, *source, *sink;
+  GstElement *pipeline, *source, *sink, *filter;
   GstBus *bus;
   GstStateChangeReturn ret;
 
@@ -35,6 +35,7 @@ int main(int argc, char *argv[]) {
   /* Create the elements */
   source = gst_element_factory_make ("videotestsrc", "source");
   sink = gst_element_factory_make ("autovideosink", "sink");
+  filter = gst_element_factory_make("vertigotv", "filter");
 
   /* Create the empty pipeline */
   pipeline = gst_pipeline_new ("test-pipeline");
@@ -45,9 +46,15 @@ int main(int argc, char *argv[]) {
   }
 
   /* Build the pipeline */
-  gst_bin_add_many (GST_BIN (pipeline), source, sink, NULL);
-  if (gst_element_link (source, sink) != TRUE) {
-    g_printerr ("Elements could not be linked.\n");
+  gst_bin_add_many (GST_BIN (pipeline), source, filter, sink, NULL);
+
+  if (gst_element_link (source, filter) != TRUE) {
+    g_printerr ("Elements (source, filter) could not be linked.\n");
+    gst_object_unref (pipeline);
+    return -1;
+  }
+  if (gst_element_link (filter, sink) != TRUE) {
+    g_printerr ("Elements (filter, sink) could not be linked.\n");
     gst_object_unref (pipeline);
     return -1;
   }
