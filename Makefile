@@ -1,16 +1,19 @@
 CC := /usr/local/opt/llvm/bin/clang
-CXX := /usr/local/opt/llvm/bin/clang
+CXX := /usr/local/opt/llvm/bin/clang++
 
 .DEFAULT_GOAL := all
 
-
-_build/%: src/%.c
+_build/src/gstreamermm/%: src/gstreamermm/%.cpp
 	mkdir -p $(dir $@)
-	$(CC) $(shell pkg-config --cflags --libs gstreamer-1.0) -MJ./$@.json -o $@ $<
+	$(CC) -O2 -Wall -lc++ $(shell pkg-config --cflags --libs gstreamermm-1.0) -MJ./$@.json -o $@ $<
 
-_build/%: src/%.cpp
+_build/%: %.c
 	mkdir -p $(dir $@)
-	$(CXX) -Wall -std=c++17 $(shell pkg-config --cflags --libs gstreamer-1.0) -MJ./$@.json -o $@ $<
+	$(CC) -O2 $(shell pkg-config --cflags --libs gstreamer-1.0) -MJ./$@.json -o $@ $<
+
+_build/%: %.cpp
+	mkdir -p $(dir $@)
+	$(CXX) -O2 -Wall -std=c++17 $(shell pkg-config --cflags --libs gstreamer-1.0) -MJ./$@.json -o $@ $<
 
 compile_commands.json: $(wildcard _build/*.json)
 	@echo writing $@...
@@ -23,4 +26,4 @@ clean:
 	$(RM) compile_commands.json
 	$(RM) $(patsubst %.c,%,$(wildcard *.c))
 
-all: $(subst src,_build,$(basename $(shell rg src --files -g '*.c' -g '*.cpp'))) compile_commands.json
+all: $(addprefix _build/,$(basename $(shell rg src --files -g '*.c' -g '*.cpp'))) compile_commands.json
