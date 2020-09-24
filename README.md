@@ -1,5 +1,21 @@
 # GStreamer tutorials
 
+## Setup
+
+Install the following packages from Homebrew:
+
+- llvm
+- gstreamer
+- gst-plugins-base
+- gst-plugins-good
+- gst-plugins-bad
+- gstreamermm (for the experiments with the gstreamermm C++ wrappers)
+
+## Building the files
+
+Just run `make`. This should build all the examples, and generate
+`compile_commands.json` files for editors. Build output is in `_build`.
+
 ## Making Basic Tutorials run on OSX
 
 The basic tutorials use helper funtions to run the main loop and retrieve

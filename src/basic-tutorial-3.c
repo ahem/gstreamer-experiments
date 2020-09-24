@@ -22,8 +22,6 @@ int main(int argc, char *argv[]) {
   CustomData data;
   GstBus *bus;
   GstMessage *msg;
-  GstStateChangeReturn ret;
-  gboolean terminate = FALSE;
 
   /* Initialize GStreamer */
   gst_init(&argc, &argv);
@@ -73,7 +71,7 @@ int main(int argc, char *argv[]) {
   g_signal_connect(data.source, "pad-added", G_CALLBACK(pad_added_handler), &data);
 
   /* Start playing */
-  ret = gst_element_set_state(data.pipeline, GST_STATE_PLAYING);
+  int ret = gst_element_set_state(data.pipeline, GST_STATE_PLAYING);
   if (ret == GST_STATE_CHANGE_FAILURE) {
     g_printerr("Unable to set the pipeline to the playing state.\n");
     gst_object_unref(data.pipeline);

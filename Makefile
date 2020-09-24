@@ -7,9 +7,18 @@ _build/src/gstreamermm/%: src/gstreamermm/%.cpp
 	mkdir -p $(dir $@)
 	$(CC) -O2 -Wall -lc++ $(shell pkg-config --cflags --libs gstreamermm-1.0) -MJ./$@.json -o $@ $<
 
+_build/src/basic-tutorial-5: src/basic-tutorial-5.c
+	mkdir -p $(dir $@)
+	$(CC) -g -Wall $(shell pkg-config --cflags --libs gstreamer-video-1.0 gtk+-3.0 gstreamer-1.0) -MJ./$@.json -o $@ $<
+
+_build/src/basic-tutorial-8: src/basic-tutorial-8.c
+	mkdir -p $(dir $@)
+	$(CC) -g -Wall $(shell pkg-config --cflags --libs gstreamer-1.0 gstreamer-audio-1.0) -MJ./$@.json -o $@ $<
+
+
 _build/%: %.c
 	mkdir -p $(dir $@)
-	$(CC) -O2 $(shell pkg-config --cflags --libs gstreamer-1.0) -MJ./$@.json -o $@ $<
+	$(CC) -O2 -Wall $(shell pkg-config --cflags --libs gstreamer-1.0) -MJ./$@.json -o $@ $<
 
 _build/%: %.cpp
 	mkdir -p $(dir $@)
