@@ -5,7 +5,7 @@ CXX := /usr/local/opt/llvm/bin/clang++
 
 _build/%.so: %.c
 	mkdir -p $(dir $@)
-	$(CC) -O2 -shared -Wall $(shell pkg-config --cflags --libs gstreamer-1.0 gstreamer-base-1.0 gstreamer-gl-1.0) -MJ./$@.json -o $@ $<
+	$(CC) -O2 -shared -Wall $(shell pkg-config --cflags --libs gstreamer-1.0 gstreamer-gl-1.0) -MJ./$@.json -o $@ $<
 
 _build/src/gstreamermm/%: src/gstreamermm/%.cpp
 	mkdir -p $(dir $@)
