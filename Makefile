@@ -3,6 +3,10 @@ CXX := /usr/local/opt/llvm/bin/clang++
 
 .DEFAULT_GOAL := all
 
+_build/%.so: %.c
+	mkdir -p $(dir $@)
+	$(CC) -O2 -shared -Wall $(shell pkg-config --cflags --libs gstreamer-1.0 gstreamer-base-1.0 gstreamer-gl-1.0) -MJ./$@.json -o $@ $<
+
 _build/src/gstreamermm/%: src/gstreamermm/%.cpp
 	mkdir -p $(dir $@)
 	$(CC) -O2 -Wall -lc++ $(shell pkg-config --cflags --libs gstreamermm-1.0) -MJ./$@.json -o $@ $<
@@ -14,7 +18,6 @@ _build/src/basic-tutorial-5: src/basic-tutorial-5.c
 _build/src/basic-tutorial-8: src/basic-tutorial-8.c
 	mkdir -p $(dir $@)
 	$(CC) -g -Wall $(shell pkg-config --cflags --libs gstreamer-1.0 gstreamer-audio-1.0) -MJ./$@.json -o $@ $<
-
 
 _build/%: %.c
 	mkdir -p $(dir $@)
@@ -35,4 +38,6 @@ clean:
 	$(RM) compile_commands.json
 	$(RM) $(patsubst %.c,%,$(wildcard *.c))
 
-all: $(addprefix _build/,$(basename $(shell rg src --files -g '*.c' -g '*.cpp'))) compile_commands.json
+all: $(addprefix _build/,$(basename $(shell rg src --files -g '*.c' -g '*.cpp' -g '!*plugin*')))
+all: $(patsubst %.c,_build/%.so,$(shell rg src --files -g '**/*-plugin/*.c' -g '**/*-plugin/*.cpp'))
+all: compile_commands.json
