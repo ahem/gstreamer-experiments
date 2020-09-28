@@ -20,6 +20,22 @@ static GstStaticPadTemplate src_factory =
 #define gst_hest_src_parent_class parent_class
 G_DEFINE_TYPE(GstHestSrc, gst_hest_src, GST_TYPE_GL_BASE_SRC);
 
+const gchar *hest_vertex_shader_src = "#version 330\n"
+                                      "precision highp float;\n"
+                                      "layout(location = 0) in vec2 iPosition;\n"
+                                      "void main() {\n"
+                                      "gl_Position = vec4(iPosition, 0, 1);\n"
+                                      "}\n";
+
+const gchar *hest_fragment_shader_src = "#version 330 core\n"
+                                        "precision highp float;\n"
+                                        "out vec4 outColor;\n"
+                                        "void main() {\n"
+                                        "outColor = vec4(1);\n"
+                                        "}\n";
+
+static const GLfloat positions[] = {-1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f, -1.0f};
+
 static gboolean gst_hest_src_gl_start(GstGLBaseSrc *bsrc) {
   GstHestSrc *src = GST_HEST_SRC(bsrc);
   GST_DEBUG_OBJECT(src, "gl-start");
@@ -28,16 +44,39 @@ static gboolean gst_hest_src_gl_start(GstGLBaseSrc *bsrc) {
   guint h = GST_VIDEO_INFO_HEIGHT(&bsrc->out_info);
   src->fbo = gst_gl_framebuffer_new_with_default_depth(bsrc->context, w, h);
 
+  GError *error = NULL;
+
+  src->shader = gst_gl_shader_new_link_with_stages(
+      bsrc->context, &error,
+      gst_glsl_stage_new_with_string(bsrc->context, GL_VERTEX_SHADER, GST_GLSL_VERSION_330,
+                                     GST_GLSL_PROFILE_CORE, hest_vertex_shader_src),
+      gst_glsl_stage_new_with_string(bsrc->context, GL_FRAGMENT_SHADER, GST_GLSL_VERSION_330,
+                                     GST_GLSL_PROFILE_CORE, hest_fragment_shader_src),
+      NULL);
+
+  if (!src->shader) {
+    GST_ERROR_OBJECT(src, "%s", error->message);
+    g_error_free(error);
+    return FALSE;
+  }
+
+  const GstGLFuncs *gl = bsrc->context->gl_vtable;
+
+  gl->GenVertexArrays(1, &src->vao);
+  gl->BindVertexArray(src->vao);
+
+  gl->GenBuffers(1, &src->positionBuffer);
+  gl->BindBuffer(GL_ARRAY_BUFFER, src->positionBuffer);
+  gl->BufferData(GL_ARRAY_BUFFER, sizeof(positions), &positions, GL_STATIC_DRAW);
+
+  gint position_attribute_location = gst_gl_shader_get_attribute_location(src->shader, "iPosition");
+  gl->VertexAttribPointer(position_attribute_location, 2, GL_FLOAT, FALSE, 0, 0);
+
+  gl->BindBuffer(GL_ARRAY_BUFFER, 0);
+  gl->BindVertexArray(0);
+  gst_gl_context_clear_shader(bsrc->context);
+
   return TRUE;
-}
-
-static void gst_hest_src_gl_stop(GstGLBaseSrc *bsrc) {
-  GstHestSrc *src = GST_HEST_SRC(bsrc);
-  GST_DEBUG_OBJECT(src, "gl-stop");
-
-  if (src->fbo)
-    gst_object_unref(src->fbo);
-  src->fbo = NULL;
 }
 
 static gboolean gst_hest_src_callback(gpointer ptr) {
@@ -45,15 +84,42 @@ static gboolean gst_hest_src_callback(gpointer ptr) {
   GstGLBaseSrc *glbasesrc = GST_GL_BASE_SRC(src);
 
   const GstGLFuncs *gl = glbasesrc->context->gl_vtable;
-  gl->ClearColor(1.0f, 1.0f, 0.0f, 1.0f);
-  gl->Clear(GL_COLOR_BUFFER_BIT);
+
+  gl->Disable(GL_CULL_FACE);
+  gl->Disable(GL_DEPTH_TEST);
+
+  gl->ClearColor(0.3f, 0.3f, 0.3f, 1.0f);
+  gl->Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  gst_gl_shader_use(src->shader);
+  GST_DEBUG_OBJECT(src, "<glError check> 1: %d", gl->GetError());
+  gl->BindVertexArray(src->vao);
+  GST_DEBUG_OBJECT(src, "<glError check> 2: %d", gl->GetError());
+  gl->DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+  GST_DEBUG_OBJECT(src, "<glError check> 3: %d", gl->GetError());
+
+  gst_gl_context_clear_shader(glbasesrc->context);
 
   return TRUE;
 }
 
+static void gst_hest_src_gl_stop(GstGLBaseSrc *bsrc) {
+  GstHestSrc *src = GST_HEST_SRC(bsrc);
+  GST_DEBUG_OBJECT(src, "gl-stop");
+
+  if (src->positionBuffer)
+    bsrc->context->gl_vtable->DeleteBuffers(1, &src->positionBuffer);
+  if (src->vao)
+    bsrc->context->gl_vtable->DeleteVertexArrays(1, &src->vao);
+  if (src->shader)
+    gst_object_unref(src->shader);
+  if (src->fbo)
+    gst_object_unref(src->fbo);
+  src->fbo = NULL;
+}
+
 static gboolean gst_hest_src_fill_memory(GstGLBaseSrc *bsrc, GstGLMemory *memory) {
   GstHestSrc *src = GST_HEST_SRC(bsrc);
-  GST_DEBUG_OBJECT(src, "fill-memory");
 
   return gst_gl_framebuffer_draw_to_texture(src->fbo, memory, gst_hest_src_callback, src);
 }
@@ -97,6 +163,7 @@ static void gst_hest_src_class_init(GstHestSrcClass *klass) {
   gstglbasesrc_class->gl_start = gst_hest_src_gl_start;
   gstglbasesrc_class->gl_stop = gst_hest_src_gl_stop;
   gstglbasesrc_class->fill_gl_memory = gst_hest_src_fill_memory;
+  gstglbasesrc_class->supported_gl_api = GST_GL_API_OPENGL3;
 
   gstbasesrc_class->fixate = gst_hest_src_fixate;
 }

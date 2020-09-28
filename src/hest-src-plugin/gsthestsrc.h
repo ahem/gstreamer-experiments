@@ -16,6 +16,9 @@ G_BEGIN_DECLS
 typedef struct _GstHestSrc {
   GstGLBaseSrc element;
   GstGLFramebuffer *fbo;
+  GstGLShader *shader;
+  guint vao;
+  guint positionBuffer;
 } GstHestSrc;
 
 typedef struct _GstHestSrcClass {
