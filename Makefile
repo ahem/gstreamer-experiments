@@ -3,6 +3,14 @@ CXX := /usr/local/opt/llvm/bin/clang++
 
 .DEFAULT_GOAL := all
 
+_build/src/girafsrc-plugin/girafsrc.o: src/girafsrc-plugin/girafsrc.c src/girafsrc-plugin/girafsrc.h src/girafsrc-plugin/gstgirafsrc.h
+	mkdir -p $(dir $@)
+	$(CC) -O2 -Wall -c $(shell pkg-config --cflags gstreamer-1.0 gstreamer-gl-1.0) -MJ./$@.json -o $@ $<
+
+_build/src/girafsrc-plugin/gstgirafsrc.so: src/girafsrc-plugin/gstgirafsrc.c src/girafsrc-plugin/gstgirafsrc.h _build/src/girafsrc-plugin/girafsrc.o
+	mkdir -p $(dir $@)
+	$(CC) -O2 -shared -Wall $(shell pkg-config --cflags --libs gstreamer-1.0 gstreamer-gl-1.0) -MJ./$@.json _build/src/girafsrc-plugin/girafsrc.o -o $@ $<
+
 _build/%.so: %.c
 	mkdir -p $(dir $@)
 	$(CC) -O2 -shared -Wall $(shell pkg-config --cflags --libs gstreamer-1.0 gstreamer-gl-1.0) -MJ./$@.json -o $@ $<
