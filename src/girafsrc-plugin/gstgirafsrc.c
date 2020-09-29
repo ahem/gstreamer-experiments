@@ -52,7 +52,6 @@ GST_DEBUG_CATEGORY_STATIC(giraf_src_debug);
 
 enum {
   PROP_0,
-  PROP_PATTERN,
   PROP_IS_LIVE
   /* FILL ME */
 };
@@ -71,7 +70,6 @@ static GstStaticPadTemplate src_factory =
 #define gst_giraf_src_parent_class parent_class
 G_DEFINE_TYPE(GstGirafSrc, gst_giraf_src, GST_TYPE_GL_BASE_SRC);
 
-static void gst_giraf_src_set_pattern(GstGirafSrc *girafsrc, int pattern_type);
 static void gst_giraf_src_set_property(GObject *object, guint prop_id, const GValue *value,
                                        GParamSpec *pspec);
 static void gst_giraf_src_get_property(GObject *object, guint prop_id, GValue *value,
@@ -83,18 +81,6 @@ static gboolean gst_giraf_src_callback(gpointer stuff);
 static gboolean gst_giraf_src_gl_start(GstGLBaseSrc *src);
 static void gst_giraf_src_gl_stop(GstGLBaseSrc *src);
 static gboolean gst_giraf_src_fill_memory(GstGLBaseSrc *src, GstGLMemory *memory);
-
-#define GST_TYPE_GIRAF_SRC_PATTERN (gst_giraf_src_pattern_get_type())
-static GType gst_giraf_src_pattern_get_type(void) {
-  static GType giraf_src_pattern_type = 0;
-  static const GEnumValue pattern_types[] = {
-      {GST_GIRAF_SRC_CHECKERS8, "Checkers 8px", "checkers-8"}, {0, NULL, NULL}};
-
-  if (!giraf_src_pattern_type) {
-    giraf_src_pattern_type = g_enum_register_static("GstGirafSrcPattern", pattern_types);
-  }
-  return giraf_src_pattern_type;
-}
 
 static void gst_giraf_src_class_init(GstGirafSrcClass *klass) {
   GObjectClass *gobject_class;
@@ -112,11 +98,6 @@ static void gst_giraf_src_class_init(GstGirafSrcClass *klass) {
   gobject_class->set_property = gst_giraf_src_set_property;
   gobject_class->get_property = gst_giraf_src_get_property;
 
-  g_object_class_install_property(
-      gobject_class, PROP_PATTERN,
-      g_param_spec_enum("pattern", "Pattern", "Type of test pattern to generate",
-                        GST_TYPE_GIRAF_SRC_PATTERN, GST_GIRAF_SRC_CHECKERS8,
-                        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   g_object_class_install_property(gobject_class, PROP_IS_LIVE,
                                   g_param_spec_boolean("is-live", "Is Live",
                                                        "Whether to act as a live source", FALSE,
@@ -131,17 +112,13 @@ static void gst_giraf_src_class_init(GstGirafSrcClass *klass) {
   gstbasesrc_class->is_seekable = gst_giraf_src_is_seekable;
   gstbasesrc_class->fixate = gst_giraf_src_fixate;
 
-  gstglbasesrc_class->supported_gl_api = GST_GL_API_OPENGL | GST_GL_API_OPENGL3 | GST_GL_API_GLES2;
+  gstglbasesrc_class->supported_gl_api = GST_GL_API_OPENGL3;
   gstglbasesrc_class->gl_start = gst_giraf_src_gl_start;
   gstglbasesrc_class->gl_stop = gst_giraf_src_gl_stop;
   gstglbasesrc_class->fill_gl_memory = gst_giraf_src_fill_memory;
-
-  gst_type_mark_as_plugin_api(GST_TYPE_GIRAF_SRC_PATTERN, 0);
 }
 
-static void gst_giraf_src_init(GstGirafSrc *src) {
-  gst_giraf_src_set_pattern(src, GST_GIRAF_SRC_CHECKERS8);
-}
+static void gst_giraf_src_init(GstGirafSrc *src) {}
 
 static GstCaps *gst_giraf_src_fixate(GstBaseSrc *bsrc, GstCaps *caps) {
   GstStructure *structure;
@@ -161,18 +138,11 @@ static GstCaps *gst_giraf_src_fixate(GstBaseSrc *bsrc, GstCaps *caps) {
   return caps;
 }
 
-static void gst_giraf_src_set_pattern(GstGirafSrc *girafsrc, gint pattern_type) {
-  girafsrc->set_pattern = pattern_type;
-}
-
 static void gst_giraf_src_set_property(GObject *object, guint prop_id, const GValue *value,
                                        GParamSpec *pspec) {
   GstGirafSrc *src = GST_GIRAF_SRC(object);
 
   switch (prop_id) {
-  case PROP_PATTERN:
-    gst_giraf_src_set_pattern(src, g_value_get_enum(value));
-    break;
   case PROP_IS_LIVE:
     gst_base_src_set_live(GST_BASE_SRC(src), g_value_get_boolean(value));
     break;
@@ -186,9 +156,6 @@ static void gst_giraf_src_get_property(GObject *object, guint prop_id, GValue *v
   GstGirafSrc *src = GST_GIRAF_SRC(object);
 
   switch (prop_id) {
-  case PROP_PATTERN:
-    g_value_set_enum(value, src->set_pattern);
-    break;
   case PROP_IS_LIVE:
     g_value_set_boolean(value, gst_base_src_is_live(GST_BASE_SRC(src)));
     break;
@@ -205,41 +172,29 @@ static gboolean gst_giraf_src_is_seekable(GstBaseSrc *psrc) {
 
 static gboolean gst_giraf_src_callback(gpointer stuff) {
   GstGirafSrc *src = GST_GIRAF_SRC(stuff);
-  GstGLBaseSrc *glbasesrc = GST_GL_BASE_SRC(src);
-  const struct SrcFuncs *funcs;
-
-  funcs = src->src_funcs;
-
-  if (!funcs || src->set_pattern != src->active_pattern) {
-    if (src->src_impl && funcs)
-      funcs->free(src->src_impl);
-    src->src_funcs = funcs = gst_giraf_src_get_src_funcs_for_pattern(src->set_pattern);
-    if (funcs == NULL) {
-      GST_ERROR_OBJECT(src, "Could not find an implementation of the "
-                            "requested pattern");
-      return FALSE;
-    }
-    src->src_impl = funcs->new (src);
-    if (!funcs->init(src->src_impl, glbasesrc->context, &glbasesrc->out_info)) {
-      GST_ERROR_OBJECT(src, "Failed to initialize pattern");
-      return FALSE;
-    }
-    src->active_pattern = src->set_pattern;
-  }
-
-  return funcs->fill_bound_fbo(src->src_impl);
+  return _src_checkers_fill_bound_fbo(src->src_impl);
 }
 
 static gboolean gst_giraf_src_fill_memory(GstGLBaseSrc *src, GstGLMemory *memory) {
   GstGirafSrc *test_src = GST_GIRAF_SRC(src);
+
   return gst_gl_framebuffer_draw_to_texture(test_src->fbo, memory, gst_giraf_src_callback,
                                             test_src);
 }
 
 static gboolean gst_giraf_src_gl_start(GstGLBaseSrc *bsrc) {
   GstGirafSrc *src = GST_GIRAF_SRC(bsrc);
+  GstGLBaseSrc *glbasesrc = GST_GL_BASE_SRC(src);
+
   src->fbo = gst_gl_framebuffer_new_with_default_depth(
       bsrc->context, GST_VIDEO_INFO_WIDTH(&bsrc->out_info), GST_VIDEO_INFO_HEIGHT(&bsrc->out_info));
+
+  src->src_impl = _src_checkers8_new(src);
+  if (!_src_checkers_init(src->src_impl, glbasesrc->context, &glbasesrc->out_info)) {
+    GST_ERROR_OBJECT(src, "Failed to initialize pattern");
+    return FALSE;
+  }
+
   return TRUE;
 }
 
@@ -251,9 +206,8 @@ static void gst_giraf_src_gl_stop(GstGLBaseSrc *bsrc) {
   src->fbo = NULL;
 
   if (src->src_impl)
-    src->src_funcs->free(src->src_impl);
+    _src_checkers_free(src->src_impl);
   src->src_impl = NULL;
-  src->src_funcs = NULL;
 }
 
 static gboolean plugin_init(GstPlugin *plugin) {

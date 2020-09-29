@@ -27,7 +27,7 @@ const gchar *hest_vertex_shader_src = "#version 330\n"
                                       "gl_Position = vec4(iPosition, 0, 1);\n"
                                       "}\n";
 
-const gchar *hest_fragment_shader_src = "#version 330 core\n"
+const gchar *hest_fragment_shader_src = "#version 330\n"
                                         "precision highp float;\n"
                                         "out vec4 outColor;\n"
                                         "void main() {\n"
@@ -38,7 +38,6 @@ static const GLfloat positions[] = {-1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f,
 
 static gboolean gst_hest_src_gl_start(GstGLBaseSrc *bsrc) {
   GstHestSrc *src = GST_HEST_SRC(bsrc);
-  GST_DEBUG_OBJECT(src, "gl-start");
 
   guint w = GST_VIDEO_INFO_WIDTH(&bsrc->out_info);
   guint h = GST_VIDEO_INFO_HEIGHT(&bsrc->out_info);
@@ -67,14 +66,14 @@ static gboolean gst_hest_src_gl_start(GstGLBaseSrc *bsrc) {
 
   gl->GenBuffers(1, &src->positionBuffer);
   gl->BindBuffer(GL_ARRAY_BUFFER, src->positionBuffer);
-  gl->BufferData(GL_ARRAY_BUFFER, sizeof(positions), &positions, GL_STATIC_DRAW);
+  gl->BufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
 
   gint position_attribute_location = gst_gl_shader_get_attribute_location(src->shader, "iPosition");
-  gl->VertexAttribPointer(position_attribute_location, 2, GL_FLOAT, FALSE, 0, 0);
+  gl->VertexAttribPointer(position_attribute_location, 2, GL_FLOAT, FALSE, 2 * sizeof(gfloat), 0);
+  gl->EnableVertexAttribArray(position_attribute_location);
 
   gl->BindBuffer(GL_ARRAY_BUFFER, 0);
   gl->BindVertexArray(0);
-  gst_gl_context_clear_shader(bsrc->context);
 
   return TRUE;
 }
@@ -92,11 +91,9 @@ static gboolean gst_hest_src_callback(gpointer ptr) {
   gl->Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   gst_gl_shader_use(src->shader);
-  GST_DEBUG_OBJECT(src, "<glError check> 1: %d", gl->GetError());
   gl->BindVertexArray(src->vao);
-  GST_DEBUG_OBJECT(src, "<glError check> 2: %d", gl->GetError());
+
   gl->DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-  GST_DEBUG_OBJECT(src, "<glError check> 3: %d", gl->GetError());
 
   gst_gl_context_clear_shader(glbasesrc->context);
 
@@ -105,7 +102,6 @@ static gboolean gst_hest_src_callback(gpointer ptr) {
 
 static void gst_hest_src_gl_stop(GstGLBaseSrc *bsrc) {
   GstHestSrc *src = GST_HEST_SRC(bsrc);
-  GST_DEBUG_OBJECT(src, "gl-stop");
 
   if (src->positionBuffer)
     bsrc->context->gl_vtable->DeleteBuffers(1, &src->positionBuffer);

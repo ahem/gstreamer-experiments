@@ -49,13 +49,7 @@ struct _GstGirafSrc {
   GstGLBaseSrc element;
 
   /*< private >*/
-
-  /* type of output */
-  GstGirafSrcPattern set_pattern;
-  GstGirafSrcPattern active_pattern;
-
   GstGLFramebuffer *fbo;
-  const struct SrcFuncs *src_funcs;
   gpointer src_impl;
 };
 

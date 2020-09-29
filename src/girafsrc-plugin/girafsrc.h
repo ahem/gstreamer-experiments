@@ -42,14 +42,9 @@ struct BaseSrcImpl {
   GstVideoInfo v_info;
 };
 
-struct SrcFuncs {
-  GstGirafSrcPattern pattern;
-  gpointer (*new)(GstGirafSrc *src);
-  gboolean (*init)(gpointer impl, GstGLContext *context, GstVideoInfo *v_info);
-  gboolean (*fill_bound_fbo)(gpointer impl);
-  void (*free)(gpointer impl);
-};
-
-const struct SrcFuncs *gst_giraf_src_get_src_funcs_for_pattern(GstGirafSrcPattern pattern);
+gboolean _src_checkers_init(gpointer impl, GstGLContext *context, GstVideoInfo *v_info);
+void _src_checkers_free(gpointer impl);
+gpointer _src_checkers8_new(GstGirafSrc *test);
+gboolean _src_checkers_fill_bound_fbo(gpointer impl);
 
 #endif
