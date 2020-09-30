@@ -2,11 +2,12 @@
 #include "config.h"
 #endif
 
-#include "gsthestsrc.h"
+#include "metaballs.vert.h"
+#include "metaballssrc.h"
 #include <gst/gl/gstglfuncs.h>
 
-GST_DEBUG_CATEGORY_STATIC(hest_src_debug_category);
-#define GST_CAT_DEFAULT hest_src_debug_category
+GST_DEBUG_CATEGORY_STATIC(metaballs_src_debug_category);
+#define GST_CAT_DEFAULT metaballs_src_debug_category
 
 static GstStaticPadTemplate src_factory =
     GST_STATIC_PAD_TEMPLATE("src", GST_PAD_SRC, GST_PAD_ALWAYS,
@@ -17,27 +18,20 @@ static GstStaticPadTemplate src_factory =
                                             "framerate = " GST_VIDEO_FPS_RANGE ","
                                             "texture-target = (string) 2D"));
 
-#define gst_hest_src_parent_class parent_class
-G_DEFINE_TYPE(GstHestSrc, gst_hest_src, GST_TYPE_GL_BASE_SRC);
+#define gst_metaballs_src_parent_class parent_class
+G_DEFINE_TYPE(GstMetaballsSrc, gst_metaballs_src, GST_TYPE_GL_BASE_SRC);
 
-const gchar *hest_vertex_shader_src = "#version 330\n"
-                                      "precision highp float;\n"
-                                      "layout(location = 0) in vec2 iPosition;\n"
-                                      "void main() {\n"
-                                      "gl_Position = vec4(iPosition, 0, 1);\n"
-                                      "}\n";
-
-const gchar *hest_fragment_shader_src = "#version 330\n"
-                                        "precision highp float;\n"
-                                        "out vec4 outColor;\n"
-                                        "void main() {\n"
-                                        "outColor = vec4(1);\n"
-                                        "}\n";
+const gchar *metaballs_fragment_shader_src = "#version 330\n"
+                                             "precision highp float;\n"
+                                             "out vec4 outColor;\n"
+                                             "void main() {\n"
+                                             "outColor = vec4(1);\n"
+                                             "}\n";
 
 static const GLfloat positions[] = {-1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f, -1.0f};
 
-static gboolean gst_hest_src_gl_start(GstGLBaseSrc *bsrc) {
-  GstHestSrc *src = GST_HEST_SRC(bsrc);
+static gboolean gst_metaballs_src_gl_start(GstGLBaseSrc *bsrc) {
+  GstMetaballsSrc *src = GST_METABALLS_SRC(bsrc);
 
   guint w = GST_VIDEO_INFO_WIDTH(&bsrc->out_info);
   guint h = GST_VIDEO_INFO_HEIGHT(&bsrc->out_info);
@@ -48,9 +42,9 @@ static gboolean gst_hest_src_gl_start(GstGLBaseSrc *bsrc) {
   src->shader = gst_gl_shader_new_link_with_stages(
       bsrc->context, &error,
       gst_glsl_stage_new_with_string(bsrc->context, GL_VERTEX_SHADER, GST_GLSL_VERSION_330,
-                                     GST_GLSL_PROFILE_CORE, hest_vertex_shader_src),
+                                     GST_GLSL_PROFILE_CORE, metaballs_vert),
       gst_glsl_stage_new_with_string(bsrc->context, GL_FRAGMENT_SHADER, GST_GLSL_VERSION_330,
-                                     GST_GLSL_PROFILE_CORE, hest_fragment_shader_src),
+                                     GST_GLSL_PROFILE_CORE, metaballs_fragment_shader_src),
       NULL);
 
   if (!src->shader) {
@@ -78,8 +72,8 @@ static gboolean gst_hest_src_gl_start(GstGLBaseSrc *bsrc) {
   return TRUE;
 }
 
-static gboolean gst_hest_src_callback(gpointer ptr) {
-  GstHestSrc *src = GST_HEST_SRC(ptr);
+static gboolean gst_metaballs_src_callback(gpointer ptr) {
+  GstMetaballsSrc *src = GST_METABALLS_SRC(ptr);
   GstGLBaseSrc *glbasesrc = GST_GL_BASE_SRC(src);
 
   const GstGLFuncs *gl = glbasesrc->context->gl_vtable;
@@ -100,8 +94,8 @@ static gboolean gst_hest_src_callback(gpointer ptr) {
   return TRUE;
 }
 
-static void gst_hest_src_gl_stop(GstGLBaseSrc *bsrc) {
-  GstHestSrc *src = GST_HEST_SRC(bsrc);
+static void gst_metaballs_src_gl_stop(GstGLBaseSrc *bsrc) {
+  GstMetaballsSrc *src = GST_METABALLS_SRC(bsrc);
 
   if (src->positionBuffer)
     bsrc->context->gl_vtable->DeleteBuffers(1, &src->positionBuffer);
@@ -114,13 +108,13 @@ static void gst_hest_src_gl_stop(GstGLBaseSrc *bsrc) {
   src->fbo = NULL;
 }
 
-static gboolean gst_hest_src_fill_memory(GstGLBaseSrc *bsrc, GstGLMemory *memory) {
-  GstHestSrc *src = GST_HEST_SRC(bsrc);
+static gboolean gst_metaballs_src_fill_memory(GstGLBaseSrc *bsrc, GstGLMemory *memory) {
+  GstMetaballsSrc *src = GST_METABALLS_SRC(bsrc);
 
-  return gst_gl_framebuffer_draw_to_texture(src->fbo, memory, gst_hest_src_callback, src);
+  return gst_gl_framebuffer_draw_to_texture(src->fbo, memory, gst_metaballs_src_callback, src);
 }
 
-static GstCaps *gst_hest_src_fixate(GstBaseSrc *bsrc, GstCaps *caps) {
+static GstCaps *gst_metaballs_src_fixate(GstBaseSrc *bsrc, GstCaps *caps) {
   GstStructure *structure;
 
   GST_DEBUG("fixate");
@@ -137,13 +131,13 @@ static GstCaps *gst_hest_src_fixate(GstBaseSrc *bsrc, GstCaps *caps) {
   return caps;
 }
 
-static void gst_hest_src_class_init(GstHestSrcClass *klass) {
+static void gst_metaballs_src_class_init(GstMetaballsSrcClass *klass) {
   GObjectClass *gobject_class;
   GstBaseSrcClass *gstbasesrc_class;
   GstGLBaseSrcClass *gstglbasesrc_class;
   GstElementClass *element_class;
 
-  GST_DEBUG_CATEGORY_INIT(hest_src_debug_category, "hestsrc", 0,
+  GST_DEBUG_CATEGORY_INIT(metaballs_src_debug_category, "metaballssrc", 0,
                           "debug category for Hest Source element");
 
   gobject_class = G_OBJECT_CLASS(klass);
@@ -156,18 +150,18 @@ static void gst_hest_src_class_init(GstHestSrcClass *klass) {
   gst_element_class_set_static_metadata(element_class, "FIXME Long name", "Generic",
                                         "FIXME Description", "FIXME <fixme@example.com>");
 
-  gstglbasesrc_class->gl_start = gst_hest_src_gl_start;
-  gstglbasesrc_class->gl_stop = gst_hest_src_gl_stop;
-  gstglbasesrc_class->fill_gl_memory = gst_hest_src_fill_memory;
+  gstglbasesrc_class->gl_start = gst_metaballs_src_gl_start;
+  gstglbasesrc_class->gl_stop = gst_metaballs_src_gl_stop;
+  gstglbasesrc_class->fill_gl_memory = gst_metaballs_src_fill_memory;
   gstglbasesrc_class->supported_gl_api = GST_GL_API_OPENGL3;
 
-  gstbasesrc_class->fixate = gst_hest_src_fixate;
+  gstbasesrc_class->fixate = gst_metaballs_src_fixate;
 }
 
-static void gst_hest_src_init(GstHestSrc *hestSrc) {}
+static void gst_metaballs_src_init(GstMetaballsSrc *metaballsSrc) {}
 
 static gboolean plugin_init(GstPlugin *plugin) {
-  return gst_element_register(plugin, "hestsrc", GST_RANK_NONE, GST_TYPE_HEST_SRC);
+  return gst_element_register(plugin, "metaballssrc", GST_RANK_NONE, GST_TYPE_METABALLS_SRC);
 }
 
 /* FIXME: these are normally defined by the GStreamer build system.
@@ -186,5 +180,5 @@ static gboolean plugin_init(GstPlugin *plugin) {
 #ifndef GST_PACKAGE_ORIGIN
 #define GST_PACKAGE_ORIGIN "http://FIXME.org/"
 #endif
-GST_PLUGIN_DEFINE(GST_VERSION_MAJOR, GST_VERSION_MINOR, hestsrc, "FIXME plugin description",
+GST_PLUGIN_DEFINE(GST_VERSION_MAJOR, GST_VERSION_MINOR, metaballssrc, "FIXME plugin description",
                   plugin_init, VERSION, "LGPL", PACKAGE_NAME, GST_PACKAGE_ORIGIN)
